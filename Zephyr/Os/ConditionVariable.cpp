@@ -8,7 +8,8 @@
 namespace Os {
 namespace Zephyr {
 
-void ZephyrConditionVariable::wait(Os::Mutex& mutex) {
+ZephyrConditionVariable::Status ZephyrConditionVariable::pend(Os::Mutex& mutex) {
+    return ZephyrConditionVariable::Status::ERROR_NOT_IMPLEMENTED;
 }
 void ZephyrConditionVariable::notify() {
 }

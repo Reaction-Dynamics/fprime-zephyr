@@ -12,6 +12,7 @@
 //      are below are used.
 //   2) #undef CRC is needed because the CRC defined in `stm32h723xx.h` HAL header
 //      conflicts with `CmdSequencerImpl` internal CRC struct.
+#include <zephyr/kernel.h>
 #include <zephyr/kernel_structs.h>
 #include <zephyr/arch/cpu.h>
 #include <zephyr/kernel/thread.h>

@@ -4,6 +4,7 @@
 // ======================================================================
 #include "Zephyr/Os/Queue.hpp"
 #include <Fw/Types/Assert.hpp>
+#include <cstring>
 
 namespace Os {
 namespace Zephyr {

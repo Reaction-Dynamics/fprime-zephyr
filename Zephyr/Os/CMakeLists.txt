@@ -1,3 +1,4 @@
+
 add_custom_target("${FPRIME_CURRENT_MODULE}")
 
 set(SOURCE_FILES
@@ -6,11 +7,22 @@ set(SOURCE_FILES
 set(HEADER_FILES
     "${CMAKE_CURRENT_LIST_DIR}/error.hpp"
 )
-set(MOD_DEPS config)
-register_fprime_module(Os_Zephyr_Shared)
 
-add_fprime_supplied_os_module(Task Zephyr kernel Os_Zephyr_Shared)
-add_fprime_supplied_os_module(Console Zephyr kernel Os_Zephyr_Shared)
-add_fprime_supplied_os_module("Mutex;ConditionVariable" Zephyr kernel Os_Zephyr_Shared)
-add_fprime_supplied_os_module(RawTime Zephyr kernel Os_Zephyr_Shared)
-add_fprime_supplied_os_module(Queue Zephyr kernel Os_Zephyr_Shared)
+
+register_fprime_module(Os_Zephyr_Shared)
+set(MOD_DEPS config)
+
+register_os_implementation("Mutex;ConditionVariable" Zephyr kernel Os_Zephyr_Shared)
+register_os_implementation(RawTime Zephyr kernel Os_Zephyr_Shared)
+register_os_implementation(Queue Zephyr kernel Os_Zephyr_Shared)
+register_os_implementation(Console Zephyr kernel Os_Zephyr_Shared)
+register_os_implementation(Task Zephyr kernel Os_Zephyr_Shared)
+
+# target_link_libraries(Os_Zephyr_Shared PRIVATE ZephyrKernel)
+
+# register_os_implementation("Mutex" Zephyr kernel Os_Zephyr_Shared)
+# register_os_implementation("ConditionVariable" Zephyr kernel Os_Zephyr_Shared)
+# register_os_implementation("Task" Zephyr kernel Os_Zephyr_Shared Fw_Types)
+# register_os_implementation("Queue" Zephyr kernel Os_Zephyr_Shared)
+# register_os_implementation("Console" Zephyr kernel Os_Zephyr_Shared)
+# register_os_implementation("RawTime" Zephyr kernel Os_Zephyr_Shared)

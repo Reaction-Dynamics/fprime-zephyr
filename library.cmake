@@ -1,4 +1,4 @@
-set(CMAKE_EXE_LINKER_FLAGS_INIT "--specs=nosys.specs")
+restrict_platforms(Zephyr)
 
 # TEMPORARY FIX: Add ASSERT_RELATIVE_PATH definition for FW_ASSERT_LEVEL = FW_RELATIVE_PATH_ASSERT
 if(NOT DEFINED ASSERT_RELATIVE_PATH)
