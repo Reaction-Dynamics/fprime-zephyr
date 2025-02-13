@@ -36,6 +36,7 @@ ZephyrMutex::Status ZephyrMutex::release() {
 }
 
 MutexHandle* ZephyrMutex::getHandle() {
+    FW_ASSERT((void *)&this->m_handle.m_mutex_descriptor != nullptr);
     return &this->m_handle;
 }
 
