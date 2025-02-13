@@ -16,6 +16,7 @@ void zephyrEntryWrapper(void* wrapper_pointer,  //!< Pointer to `Task::TaskRouti
     FW_ASSERT(wrapper_pointer != nullptr);
     Os::Task::TaskRoutineWrapper& wrapper = *reinterpret_cast<Os::Task::TaskRoutineWrapper*>(wrapper_pointer);
     wrapper.run(&wrapper);
+    wrapper.run(p2);
 }
 
 ZephyrTask::~ZephyrTask() {
