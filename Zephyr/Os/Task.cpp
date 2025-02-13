@@ -62,7 +62,7 @@ Os::TaskInterface::Status ZephyrTask::start(const Os::TaskInterface::Arguments& 
     }
 
     k_tid_t tid = k_thread_create(thread, stack, arguments.m_stackSize, zephyrEntryWrapper, (void*)&arguments.m_routine,
-                                  nullptr, nullptr, priority, 0, K_NO_WAIT);
+                                  (void*)arguments.m_routine_argument, nullptr, priority, 0, K_NO_WAIT);
 #ifdef CONFIG_THREAD_NAME
     NATIVE_INT_TYPE ret = k_thread_name_set(thread, arguments.m_name.toChar());
     FW_ASSERT(ret == 0, ret);
