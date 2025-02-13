@@ -17,6 +17,8 @@ register_os_implementation(RawTime Zephyr kernel Os_Zephyr_Shared)
 register_os_implementation(Queue Zephyr kernel Os_Zephyr_Shared)
 register_os_implementation(Console Zephyr kernel Os_Zephyr_Shared)
 register_os_implementation(Task Zephyr kernel Os_Zephyr_Shared)
+register_os_implementation("Cpu" Zephyr)
+register_os_implementation("Memory" Zephyr)
 
 # target_link_libraries(Os_Zephyr_Shared PRIVATE ZephyrKernel)
 
