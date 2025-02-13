@@ -75,7 +75,7 @@ Os::TaskInterface::Status ZephyrTask::start(const Os::TaskInterface::Arguments& 
 }
 
 bool ZephyrTask::isCooperative() {
-    return true;
+    return false;
 }
 
 Os::Task::Status ZephyrTask::_delay(Fw::TimeInterval interval) {
