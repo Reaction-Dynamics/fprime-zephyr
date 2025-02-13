@@ -5,17 +5,20 @@
 #include "Zephyr/Os/Task.hpp"
 #include <Fw/Types/Assert.hpp>
 #include <Fw/Logger/Logger.hpp>
+#include "zephyr/debug/thread_analyzer.h"
+#include "zephyr/sys/kobject.h"
 namespace Os {
 namespace Zephyr {
 
 //! Zephyr thread entry function expects three arguments. This is a glue that creates such function.
-void zephyrEntryWrapper(void* wrapper_pointer,  //!< Pointer to `Task::TaskRoutineWrapper`
+static void zephyrEntryWrapper(void* wrapper_pointer,  //!< Pointer to `Task::TaskRoutineWrapper`
                         void* p2,  //!< Unused
                         void* p3   //!< Unused
 ) {
     FW_ASSERT(wrapper_pointer != nullptr);
     Os::Task::TaskRoutineWrapper& wrapper = *reinterpret_cast<Os::Task::TaskRoutineWrapper*>(wrapper_pointer);
-    wrapper.run(&wrapper);
+    Fw::Logger::log("Starting %p with %p %p\n", wrapper_pointer, p2, (void*)&wrapper.m_task);
+    thread_analyzer_print(0);
     wrapper.run(p2);
 }
 
@@ -51,6 +54,12 @@ Os::TaskInterface::Status ZephyrTask::start(const Os::TaskInterface::Arguments& 
 
     k_thread_stack_t* stack = k_thread_stack_alloc(arguments.m_stackSize, 0);
     k_thread* thread = reinterpret_cast<k_thread*>(k_object_alloc(K_OBJ_THREAD));
+    bool isValid = k_object_is_valid(thread, K_OBJ_THREAD);
+
+    Fw::Logger::log("Allocating %d bytes for thread %s.\n\t Stack allocated to: %p\n\t Thread Allocated to: %p - isValid: %d\n",
+                    arguments.m_stackSize, arguments.m_name.toChar(), stack, thread, isValid);
+    Fw::Logger::log("\t Routine @ %p called with %p \n",
+                    (void *)arguments.m_routine, (void *)arguments.m_routine_argument);
     if (thread == nullptr) {
         return Os::TaskInterface::Status::ERROR_RESOURCES;
     }
@@ -68,6 +77,12 @@ Os::TaskInterface::Status ZephyrTask::start(const Os::TaskInterface::Arguments& 
     NATIVE_INT_TYPE ret = k_thread_name_set(thread, arguments.m_name.toChar());
     FW_ASSERT(ret == 0, ret);
 #endif
+    if (tid == nullptr) {
+        Fw::Logger::log("Failed to create %s at %p with stack %p (%d bytes) - %p\n",
+                        arguments.m_name.toChar(), (void *)arguments.m_routine, stack, arguments.m_stackSize, thread);
+        return Os::TaskInterface::Status::INVALID_HANDLE;
+    }
+
     k_thread_start(tid);
 
     this->m_handle.m_tid = tid;

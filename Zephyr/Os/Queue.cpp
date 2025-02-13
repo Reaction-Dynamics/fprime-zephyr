@@ -4,7 +4,12 @@
 // ======================================================================
 #include "Zephyr/Os/Queue.hpp"
 #include <Fw/Types/Assert.hpp>
+#include <cstdint>
 #include <cstring>
+#include "Fw/Logger/Logger.hpp"
+#include "syscalls/kernel.h"
+#include "zephyr/debug/thread_analyzer.h"
+#include "zephyr/kernel.h"
 
 namespace Os {
 namespace Zephyr {
@@ -49,6 +54,14 @@ QueueInterface::Status ZephyrQueue::send(const U8* buffer,
     U8 tmp_buf[ZEPHYR_Q_MAX_MSG_SIZE];
     *reinterpret_cast<U16*>(tmp_buf) = static_cast<U16>(size);
     memcpy(&tmp_buf[ZEPHYR_Q_RESERVED], buffer, size);
+    // thread_analyzer_print(0);
+    struct k_msgq_attrs msgqAttrs;
+    uint32_t numUsed, numFree;
+    numFree = k_msgq_num_free_get(this->m_handle.m_msgq);
+    numUsed = k_msgq_num_used_get(this->m_handle.m_msgq);
+    k_msgq_get_attrs(this->m_handle.m_msgq, &msgqAttrs);
+    Fw::Logger::log("Free/Used %d/%d  %d size %d max %d\n", numFree, numUsed, msgqAttrs.used_msgs, msgqAttrs.msg_size, msgqAttrs.max_msgs);
+
     NATIVE_INT_TYPE ret = k_msgq_put(this->m_handle.m_msgq, tmp_buf,
                                      (blockType == QueueInterface::BlockingType::BLOCKING) ? K_FOREVER : K_NO_WAIT);
 
