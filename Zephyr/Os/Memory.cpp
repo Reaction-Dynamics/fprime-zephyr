@@ -1,8 +1,8 @@
 // ======================================================================
-// \title fprime-baremetal/Os/Zephyr/Memory.cpp
+// \title Os/Zephyr/Memory.cpp
 // \brief implementation for Os::Zephyr::ZephyrMemory
 // ======================================================================
-#include <fprime-baremetal/Os/Zephyr/Memory.hpp>
+#include <Zephyr/Os/Memory.hpp>
 
 namespace Os {
 namespace Zephyr {

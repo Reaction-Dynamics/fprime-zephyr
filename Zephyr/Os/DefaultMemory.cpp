@@ -1,9 +1,9 @@
 // ======================================================================
-// \title fprime-baremetal/Os/Zephyr/DefaultMemory.cpp
+// \title fprime-zephyr/Os/Zephyr/DefaultMemory.cpp
 // \brief sets default Os::Memory to stub implementation via linker
 // ======================================================================
 #include "Os/Memory.hpp"
-#include "fprime-baremetal/Os/Zephyr/Memory.hpp"
+#include "Zephyr/Os/Memory.hpp"
 #include "Os/Delegate.hpp"
 
 namespace Os {

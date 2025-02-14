@@ -3,7 +3,7 @@
 // \brief sets default Os::Zephyr::ZephyrCpu to stub implementation via linker
 // ======================================================================
 #include "Os/Cpu.hpp"
-#include "fprime-baremetal/Os/Zephyr//Cpu.hpp"
+#include "Zephyr/Os/Cpu.hpp"
 #include "Os/Delegate.hpp"
 
 namespace Os {

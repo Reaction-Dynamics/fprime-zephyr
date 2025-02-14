@@ -1,5 +1,5 @@
 // ======================================================================
-// \title fprime-baremetal/Os/Zephyr/Memory.hpp
+// \title fprime-zephyr/Os/Zephyr/Memory.hpp
 // \brief implementation for Os::Zephyr::ZephyrMemory, header definitions
 // ======================================================================
 #include <cstdio>

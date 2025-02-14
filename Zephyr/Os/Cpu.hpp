@@ -1,5 +1,5 @@
 // ======================================================================
-// \title fprime-baremetal/Os/Zephyr/Cpu.hpp
+// \title fprime-zephyr/Os/Zephyr/Cpu.hpp
 // \brief implementation for Os::Zephyr::ZephyrCpu header definitions
 // ======================================================================
 #include <cstdio>

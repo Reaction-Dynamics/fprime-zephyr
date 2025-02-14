@@ -14,8 +14,8 @@
 # choose_fprime_implementation(Os/RawTime Os_RawTime_Zephyr)
 
 choose_fprime_implementation(Os/File Os/File/Stub)
-choose_fprime_implementation(Os/Cpu Os/Cpu/Baremetal)
-choose_fprime_implementation(Os/Memory Os/Memory/Baremetal)
+choose_fprime_implementation(Os/Cpu Os/Cpu/Zephyr)
+choose_fprime_implementation(Os/Memory Os/Memory/Zephyr)
 choose_fprime_implementation(Os/Queue Os/Queue/Zephyr)
 choose_fprime_implementation(Os/Mutex Os/Mutex/Zephyr)
 choose_fprime_implementation(Os/Task Os/Task/Zephyr)

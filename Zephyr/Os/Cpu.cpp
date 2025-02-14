@@ -2,7 +2,7 @@
 // \title fprime-baremetal/Os/Zephyr/Cpu.hpp
 // \brief stub implementation for Os::Zephyr::ZephyrCpu, implementations
 // ======================================================================
-#include <fprime-baremetal/Os/Zephyr/Cpu.hpp>
+#include <Zephyr/Os/Cpu.hpp>
 
 namespace Os {
 namespace Zephyr {
