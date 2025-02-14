@@ -1,4 +1,4 @@
-module Baremetal {
+module Zephyr {
     @ Handles FATAL calls
     passive component FatalHandler {
         @ FATAL event receive port

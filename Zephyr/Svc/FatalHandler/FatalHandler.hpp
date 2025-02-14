@@ -1,21 +1,16 @@
 // ======================================================================
 // \title  FatalHandlerImpl.hpp
-// \author lestarch
+// \author Reginald Marr
 // \brief  hpp file for FatalHandler component implementation class
-//
-// \copyright
-// Copyright 2009-2015, by the California Institute of Technology.
-// ALL RIGHTS RESERVED.  United States Government Sponsorship
-// acknowledged.
 //
 // ======================================================================
 
-#ifndef BAREMETAL_FatalHandler_HPP
-#define BAREMETAL_FatalHandler_HPP
+#ifndef Zephyr_FatalHandler_HPP
+#define Zephyr_FatalHandler_HPP
 
 #include "Zephyr/Svc/FatalHandler/FatalHandlerComponentAc.hpp"
 
-namespace Baremetal {
+namespace Zephyr {
 
 class FatalHandler : public FatalHandlerComponentBase {
   public:

@@ -1,19 +1,14 @@
 // ======================================================================
 // \title  FatalHandlerImpl.cpp
-// \author lestarch
+// \author Reginald Marr
 // \brief  cpp file for FatalHandler component implementation class
-//
-// \copyright
-// Copyright 2024, by the California Institute of Technology.
-// ALL RIGHTS RESERVED.  United States Government Sponsorship
-// acknowledged.
 //
 // ======================================================================
 #include <FpConfig.hpp>
 #include <Fw/Logger/Logger.hpp>
 #include <Zephyr/Svc/FatalHandler/FatalHandler.hpp>
 
-namespace Baremetal {
+namespace Zephyr {
 
 // ----------------------------------------------------------------------
 // Construction, initialization, and destruction
