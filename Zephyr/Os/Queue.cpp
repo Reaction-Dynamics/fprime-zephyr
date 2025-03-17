@@ -60,7 +60,7 @@ QueueInterface::Status ZephyrQueue::send(const U8* buffer,
     numFree = k_msgq_num_free_get(this->m_handle.m_msgq);
     numUsed = k_msgq_num_used_get(this->m_handle.m_msgq);
     k_msgq_get_attrs(this->m_handle.m_msgq, &msgqAttrs);
-    Fw::Logger::log("Free/Used %d/%d  %d size %d max %d\n", numFree, numUsed, msgqAttrs.used_msgs, msgqAttrs.msg_size, msgqAttrs.max_msgs);
+    // Fw::Logger::log("Free/Used %d/%d  %d size %d max %d\n", numFree, numUsed, msgqAttrs.used_msgs, msgqAttrs.msg_size, msgqAttrs.max_msgs);
 
     NATIVE_INT_TYPE ret = k_msgq_put(this->m_handle.m_msgq, tmp_buf,
                                      (blockType == QueueInterface::BlockingType::BLOCKING) ? K_FOREVER : K_NO_WAIT);
