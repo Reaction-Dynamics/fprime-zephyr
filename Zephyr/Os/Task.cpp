@@ -5,8 +5,12 @@
 #include "Zephyr/Os/Task.hpp"
 #include <Fw/Types/Assert.hpp>
 #include <Fw/Logger/Logger.hpp>
-#include "zephyr/debug/thread_analyzer.h"
 #include "zephyr/sys/kobject.h"
+
+#ifdef CONFIG_THREAD_RUNTIME_STATS
+#include "zephyr/debug/thread_analyzer.h"
+#endif
+
 namespace Os {
 namespace Zephyr {
 
@@ -17,8 +21,11 @@ static void zephyrEntryWrapper(void* wrapper_pointer,  //!< Pointer to `Task::Ta
 ) {
     FW_ASSERT(wrapper_pointer != nullptr);
     Os::Task::TaskRoutineWrapper& wrapper = *reinterpret_cast<Os::Task::TaskRoutineWrapper*>(wrapper_pointer);
+#ifdef CONFIG_THREAD_RUNTIME_STATS
     Fw::Logger::log("Starting %p with %p %p\n", wrapper_pointer, p2, (void*)&wrapper.m_task);
     thread_analyzer_print(0);
+#endif
+
     wrapper.run(p2);
 }
 
