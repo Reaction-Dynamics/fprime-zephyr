@@ -4,3 +4,4 @@ add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/fprime-zephyr/Drv/ZephyrGpioD
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/fprime-zephyr/Drv/ZephyrRateDriver")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/fprime-zephyr/Drv/ZephyrI2CDriver")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/fprime-zephyr/Drv/ZephyrSpiDriver")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/fprime-zephyr/Svc/FatalHandler")
