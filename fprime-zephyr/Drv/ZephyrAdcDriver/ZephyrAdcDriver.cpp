@@ -33,6 +33,8 @@ namespace Zephyr {
         // Reset error counts
         for (FwIndexType i = 0; i < FW_NUM_ARRAY_ELEMENTS(this->m_errorCounts); i++) {
             this->m_errorCounts[i] = 0;
+            this->m_countSamples[i] = 0;
+            this->m_voltageSamples[i] = 0.0f;
         }
     }
     const struct adc_dt_spec ZephyrAdcDriver::ADC_CHANNELS[] = {
@@ -93,9 +95,7 @@ namespace Zephyr {
         Os::ScopeLock lock(m_mutex);
 
         for (FwSizeType i = 0; i < this->NUM_CHANNELS; i++) {
-            U32 rawValue;
-            F32 voltageValue;
-            bool status = this->readChannel(i, rawValue, voltageValue);
+            bool status = this->readChannel(i);
             if (!status) {
                 this->m_errorCounts[i]++;
                 this->log_WARNING_HI_ADC_READ_ERROR(
@@ -122,47 +122,50 @@ namespace Zephyr {
 
             // this->adcCountSample_out(i, sample);
 
-            // Update telemetry
-            this->updateChannelTelemetry(i, rawValue, voltageValue);
         }
+
+        // Update telemetry
+        this->updateChannelTelemetry();
     }
 
-    bool ZephyrAdcDriver::readChannel(FwIndexType channelIndex,
-                                               U32& rawValue, F32& voltageValue) {
+    bool ZephyrAdcDriver::readChannel(FwIndexType channelIndex) {
         // Initialize sequence for this specific channel
         (void)adc_sequence_init_dt(&this->ADC_CHANNELS[channelIndex], &this->m_sequence);
-
         // Read the channel
         int ret = adc_read_dt(&this->ADC_CHANNELS[channelIndex], &this->m_sequence);
         FW_ASSERT(ret == 0, ret, channelIndex);
 
         // Handle differential vs single-ended
-        rawValue = this->ADC_CHANNELS[channelIndex].channel_cfg.differential ?
+        U32 rawValue = this->ADC_CHANNELS[channelIndex].channel_cfg.differential ?
                    static_cast<U32>(static_cast<I16>(m_sampleBuffer)) :
                    static_cast<U32>(m_sampleBuffer);
 
-        // Convert to voltage if requested
-        // bool voltageMode;
-        // // this->paramGet_ADC_VOLTAGE_MODE(voltageMode);
+        this->m_countSamples[channelIndex] = rawValue;
 
-        // if (voltageMode) {
-        //     I32 val_mv = static_cast<I32>(rawValue);
-        //     ret = adc_raw_to_millivolts_dt(&this->ADC_CHANNELS[channelIndex], &val_mv);
-        //     voltageValue = (ret < 0) ? 0.0f : static_cast<F32>(val_mv);
-        // } else {
-        //     voltageValue = static_cast<F32>(rawValue);
-        // }
-        voltageValue = static_cast<F32>(rawValue);
+        I32 voltageValue;
+        if (this->ADC_CHANNELS[channelIndex].channel_cfg.differential) {
+            voltageValue = static_cast<I32>(static_cast<I16>(rawValue));
+        } else {
+            voltageValue = static_cast<I32>(rawValue);
+        }
+
+        ret = adc_raw_to_millivolts_dt(&this->ADC_CHANNELS[channelIndex], &voltageValue);
+        FW_ASSERT(ret == 0, ret, channelIndex);
+
+        this->m_voltageSamples[channelIndex] = static_cast<F32>(voltageValue);
 
         return true;
     }
 
-    void ZephyrAdcDriver::updateChannelTelemetry(FwIndexType channelIndex,
-                                               U32 rawValue, F32 voltageValue) {
+    void ZephyrAdcDriver::updateChannelTelemetry() {
         // Update per-channel telemetry arrays
-        // this->tlmWrite_ADC_RAW_COUNTS(channelIndex, rawValue);
-        // this->tlmWrite_ADC_VOLTAGES_MV(channelIndex, voltageValue);
-        // this->tlmWrite_ADC_ERROR_COUNT(channelIndex, m_errorCount[channelIndex]);
+        ADC_CHANNEL_U32s counts(this->m_countSamples);
+        ADC_CHANNEL_U32s errors(this->m_errorCounts);
+        ADC_CHANNEL_F32s voltages(this->m_voltageSamples);
+
+        this->tlmWrite_ADC_RAW_COUNTS(counts);
+        this->tlmWrite_ADC_ERROR_COUNT(errors);
+        this->tlmWrite_ADC_VOLTAGES_MV(voltages);
     }
 
     // ----------------------------------------------------------------------
@@ -177,10 +180,8 @@ namespace Zephyr {
     ) {
         Os::ScopeLock lock(m_mutex);
 
-        U32 rawValue;
-        F32 voltageValue;
         Fw::Logger::log("Handling read request for channel %u\n", channel);
-        bool status = this->readChannel(channel, rawValue, voltageValue);
+        bool status = this->readChannel(channel);
         if (!status) {
             this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
             return;

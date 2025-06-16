@@ -101,13 +101,13 @@ namespace Zephyr {
         // ----------------------------------------------------------------------
 
         // // Read single ADC channel
-        bool readChannel(FwIndexType channelIndex, U32& rawValue, F32& voltageValue);
+        bool readChannel(FwIndexType channelIndex);
 
         // Process all configured channels
         void processAllChannels();
 
         // Update telemetry for a channel
-        void updateChannelTelemetry(FwIndexType channelIndex, U32 rawValue, F32 voltageValue);
+        void updateChannelTelemetry();
 
         // Initialize ADC channels from device tree
         bool initializeChannels();
@@ -132,8 +132,8 @@ namespace Zephyr {
         // Sampling state
         U32 m_errorCounts[ADC_MAX_CHANNELS];
 
-        ADC_CHANNEL_F32s voltageSamples;
-        ADC_CHANNEL_U32s countSamples;
+        F32 m_voltageSamples[ADC_MAX_CHANNELS];
+        U32 m_countSamples[ADC_MAX_CHANNELS];
 
         // ADC sequence buffer for single reads
         U16 m_sampleBuffer;

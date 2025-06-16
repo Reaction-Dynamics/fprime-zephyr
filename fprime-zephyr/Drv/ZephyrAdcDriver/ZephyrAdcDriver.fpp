@@ -124,7 +124,7 @@ module Zephyr {
         telemetry ADC_VOLTAGES_MV: ADC_CHANNEL_F32s
 
         @ ADC read errors per channel
-        # telemetry ADC_ERROR_COUNT: ADC_CHANNEL_U32s
+        telemetry ADC_ERROR_COUNT: ADC_CHANNEL_U32s
 
         @ ADC sampling frequency achieved per channel
         telemetry ADC_ACTUAL_RATES: ADC_CHANNEL_F32s
