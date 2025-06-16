@@ -7,7 +7,7 @@ module Drv {
 }
 
 module Zephyr {
-    constant ADC_MAX_CHANNELS = 32
+    constant ADC_MAX_CHANNELS = 8
     array ADC_CHANNEL_U32s = [ADC_MAX_CHANNELS] U32
     array ADC_CHANNEL_F32s = [ADC_MAX_CHANNELS] F32
 
@@ -63,17 +63,6 @@ module Zephyr {
         # Commands
         # ----------------------------------------------------------------------
 
-        @ Enable/disable ADC sampling
-        async command ADC_ENABLE(
-            enable: bool @< Enable/disable ADC sampling
-        )
-
-        @ Set sampling rate for specific channel
-        async command ADC_SET_RATE(
-            channel: U8 @< Channel index (0-based)
-            rate_hz: F32 @< Sampling rate in Hz
-        )
-
         @ Read single ADC sample on demand
         async command ADC_READ_SINGLE(
             channel: U8 @< Channel index to read
@@ -86,18 +75,6 @@ module Zephyr {
         # Events
         # ----------------------------------------------------------------------
 
-        @ ADC driver initialized successfully
-        event ADC_INITIALIZED(
-            num_channels: U8 @< Number of configured channels
-        ) severity activity high \
-        format "Initialized ADC with {} channels"
-
-        @ ADC sampling enabled/disabled
-        event ADC_SAMPLING_CHANGED(
-            enabled: bool @< New sampling state
-        ) severity activity low \
-        format "Sampling enabled: {}"
-
         @ ADC read error
         event ADC_READ_ERROR(
             channel: U8 @< Channel that failed
@@ -106,10 +83,10 @@ module Zephyr {
         format "Read Error {} {}"
 
         @ ADC calibration completed
-        # event ADC_CALIBRATION_DONE(
-        #     status: Drv.AdcStatus @< Calibration result
-        # ) severity activity low \
-        # format "Calibration done: {}"
+        event ADC_CALIBRATION_DONE(
+            status: Drv.AdcStatus @< Calibration result
+        ) severity activity low \
+        format "Calibration done: {}"
 
         @ Channel configuration error
         event ADC_CHANNEL_ERROR(
@@ -154,6 +131,5 @@ module Zephyr {
 
         # Driver status
         # telemetry ADC_DRIVER_STATUS: Drv.AdcStatus
-
     }
 }

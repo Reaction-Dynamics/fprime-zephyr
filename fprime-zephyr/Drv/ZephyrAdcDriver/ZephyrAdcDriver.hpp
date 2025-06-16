@@ -7,6 +7,7 @@
 
 #ifndef ZEPHYR_ADC_DRIVER_HPP
 #define ZEPHYR_ADC_DRIVER_HPP
+#include "fprime-zephyr/Drv/ZephyrAdcDriver/ADC_CHANNEL_F32sArrayAc.hpp"
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/adc.h>
@@ -84,19 +85,6 @@ namespace Zephyr {
         // Command handler implementations
         // ----------------------------------------------------------------------
 
-        void ADC_ENABLE_cmdHandler(
-            const FwOpcodeType opCode,
-            const U32 cmdSeq,
-            bool enable
-        ) override;
-
-        void ADC_SET_RATE_cmdHandler(
-            const FwOpcodeType opCode,
-            const U32 cmdSeq,
-            U8 channel,
-            F32 rate_hz
-        ) override;
-
         void ADC_READ_SINGLE_cmdHandler(
             const FwOpcodeType opCode,
             const U32 cmdSeq,
@@ -142,18 +130,10 @@ namespace Zephyr {
         Os::Mutex m_mutex;
 
         // Sampling state
-        bool m_samplingEnabled;
+        U32 m_errorCounts[ADC_MAX_CHANNELS];
 
-        // Per-channel timing state
-        Fw::Time m_lastSampleTime[ADC_MAX_CHANNELS];
-        U32 m_sampleCount[ADC_MAX_CHANNELS];
-        U32 m_errorCount[ADC_MAX_CHANNELS];
-
-        // Calculated sample intervals (scheduler ticks)
-        U32 m_sampleInterval[ADC_MAX_CHANNELS];
-
-        // Driver initialization state
-        bool m_initialized;
+        ADC_CHANNEL_F32s voltageSamples;
+        ADC_CHANNEL_U32s countSamples;
 
         // ADC sequence buffer for single reads
         U16 m_sampleBuffer;

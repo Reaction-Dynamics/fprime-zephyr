@@ -21,27 +21,19 @@ namespace Zephyr {
     // ----------------------------------------------------------------------
     ZephyrAdcDriver::ZephyrAdcDriver(const char* const compName) :
         ZephyrAdcDriverComponentBase(compName),
-        m_samplingEnabled(false),
-        m_initialized(false),
         m_sampleBuffer(0),
         m_tlmUpdateCounter(0)
     {
         this->NUM_CHANNELS = DT_PROP_LEN(DT_PATH(zephyr_user), io_channels);
 
-        // Initialize arrays
-        for (FwSizeType i = 0; i < this->NUM_CHANNELS; i++) {
-            this->m_sampleCount[i] = 0;
-            this->m_errorCount[i] = 0;
-            this->m_sampleInterval[i] = 100; // Default to 10Hz (100 * 10ms = 1s)
-            // this->ADC_CHANNELS[i] = adcSpecs[i];
-        }
-
         // Initialize ADC sequence for single reads
         this->m_sequence.buffer = &m_sampleBuffer;
         this->m_sequence.buffer_size = sizeof(m_sampleBuffer);
-        this->m_sequence.resolution = 12; // Common resolution
-        this->m_sequence.oversampling = 0;
-        this->m_sequence.calibrate = false;
+
+        // Reset error counts
+        for (FwIndexType i = 0; i < FW_NUM_ARRAY_ELEMENTS(this->m_errorCounts); i++) {
+            this->m_errorCounts[i] = 0;
+        }
     }
     const struct adc_dt_spec ZephyrAdcDriver::ADC_CHANNELS[] = {
         DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, ADC_FOREACH_DT_SPEC_AND_COMMA)
@@ -88,17 +80,6 @@ namespace Zephyr {
         const FwIndexType portNum,
         U32 context
     ) {
-        // Only process if initialized and enabled
-        if (!m_initialized || !m_samplingEnabled) {
-            return;
-        }
-
-        // Load parameters periodically
-        // if ((context % 100) == 0) { // Every ~1 second at 10ms rate
-        //     this->parameterUpdated(this->PARAMID_ADC_SAMPLING_ENABLED);
-        //     this->parameterUpdated(this->PARAMID_ADC_SAMPLE_RATES);
-        // }
-
         // Process all configured channels
         this->processAllChannels();
 
@@ -111,12 +92,12 @@ namespace Zephyr {
     void ZephyrAdcDriver::processAllChannels() {
         Os::ScopeLock lock(m_mutex);
 
-        for (FwSizeType i = 0; i < ZephyrAdcDriver::NUM_CHANNELS; i++) {
+        for (FwSizeType i = 0; i < this->NUM_CHANNELS; i++) {
             U32 rawValue;
             F32 voltageValue;
-            bool status = readChannel(i, rawValue, voltageValue);
+            bool status = this->readChannel(i, rawValue, voltageValue);
             if (!status) {
-                m_errorCount[i]++;
+                this->m_errorCounts[i]++;
                 this->log_WARNING_HI_ADC_READ_ERROR(
                     static_cast<U8>(i),
                     static_cast<I32>(status)
@@ -142,40 +123,36 @@ namespace Zephyr {
             // this->adcCountSample_out(i, sample);
 
             // Update telemetry
-            updateChannelTelemetry(i, rawValue, voltageValue);
-
-            this->m_sampleCount[i]++;
+            this->updateChannelTelemetry(i, rawValue, voltageValue);
         }
     }
 
     bool ZephyrAdcDriver::readChannel(FwIndexType channelIndex,
                                                U32& rawValue, F32& voltageValue) {
         // Initialize sequence for this specific channel
-        (void)adc_sequence_init_dt(&ADC_CHANNELS[channelIndex], &this->m_sequence);
-
+        (void)adc_sequence_init_dt(&this->ADC_CHANNELS[channelIndex], &this->m_sequence);
 
         // Read the channel
-        int ret = adc_read_dt(&ADC_CHANNELS[channelIndex], &this->m_sequence);
-        if (ret < 0) {
-            return false;
-        }
+        int ret = adc_read_dt(&this->ADC_CHANNELS[channelIndex], &this->m_sequence);
+        FW_ASSERT(ret == 0, ret, channelIndex);
 
         // Handle differential vs single-ended
-        rawValue = ADC_CHANNELS[channelIndex].channel_cfg.differential ?
+        rawValue = this->ADC_CHANNELS[channelIndex].channel_cfg.differential ?
                    static_cast<U32>(static_cast<I16>(m_sampleBuffer)) :
                    static_cast<U32>(m_sampleBuffer);
 
         // Convert to voltage if requested
-        bool voltageMode;
-        // this->paramGet_ADC_VOLTAGE_MODE(voltageMode);
+        // bool voltageMode;
+        // // this->paramGet_ADC_VOLTAGE_MODE(voltageMode);
 
-        if (voltageMode) {
-            I32 val_mv = static_cast<I32>(rawValue);
-            ret = adc_raw_to_millivolts_dt(&ADC_CHANNELS[channelIndex], &val_mv);
-            voltageValue = (ret < 0) ? 0.0f : static_cast<F32>(val_mv);
-        } else {
-            voltageValue = static_cast<F32>(rawValue);
-        }
+        // if (voltageMode) {
+        //     I32 val_mv = static_cast<I32>(rawValue);
+        //     ret = adc_raw_to_millivolts_dt(&this->ADC_CHANNELS[channelIndex], &val_mv);
+        //     voltageValue = (ret < 0) ? 0.0f : static_cast<F32>(val_mv);
+        // } else {
+        //     voltageValue = static_cast<F32>(rawValue);
+        // }
+        voltageValue = static_cast<F32>(rawValue);
 
         return true;
     }
@@ -192,36 +169,6 @@ namespace Zephyr {
     // Command handler implementations
     // ----------------------------------------------------------------------
 
-    void ZephyrAdcDriver::ADC_ENABLE_cmdHandler(
-        const FwOpcodeType opCode,
-        const U32 cmdSeq,
-        bool enable
-    ) {
-        Os::ScopeLock lock(m_mutex);
-
-        m_samplingEnabled = enable;
-        // this->log_ACTIVITY_LOW_ADC_SAMPLING_CHANGED(enable);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-    }
-
-    void ZephyrAdcDriver::ADC_SET_RATE_cmdHandler(
-        const FwOpcodeType opCode,
-        const U32 cmdSeq,
-        U8 channel,
-        F32 rate_hz
-    ) {
-        Os::ScopeLock lock(m_mutex);
-
-        // Convert Hz to scheduler interval (assuming 10ms scheduler)
-        if (rate_hz > 0.0f) {
-            m_sampleInterval[channel] = static_cast<U32>(100.0f / rate_hz); // 100 = 1Hz at 10ms
-            m_sampleInterval[channel] = FW_MAX(m_sampleInterval[channel], 1U); // Min 1 tick
-        } else {
-            m_sampleInterval[channel] = 0xFFFFFFFF; // Effectively disabled
-        }
-
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-    }
 
     void ZephyrAdcDriver::ADC_READ_SINGLE_cmdHandler(
         const FwOpcodeType opCode,
@@ -232,7 +179,8 @@ namespace Zephyr {
 
         U32 rawValue;
         F32 voltageValue;
-        bool status = readChannel(channel, rawValue, voltageValue);
+        Fw::Logger::log("Handling read request for channel %u\n", channel);
+        bool status = this->readChannel(channel, rawValue, voltageValue);
         if (!status) {
             this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
             return;
