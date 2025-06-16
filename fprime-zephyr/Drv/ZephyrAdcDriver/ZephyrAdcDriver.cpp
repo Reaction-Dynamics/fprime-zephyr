@@ -5,46 +5,20 @@
 // ======================================================================
 
 #include "ZephyrAdcDriver.hpp"
+#include "Fw/Types/BasicTypes.h"
 #include "config/FwIndexTypeAliasAc.h"
 #include "config/FwSizeTypeAliasAc.h"
+#include "fprime-zephyr/Drv/ZephyrAdcDriver/FppConstantsAc.hpp"
 #include "fprime-zephyr/Drv/ZephyrAdcDriver/ZephyrAdcDriverComponentAc.hpp"
+#include "zephyr/drivers/adc.h"
 #include <Fw/Types/Assert.hpp>
 #include <Fw/Logger/Logger.hpp>
 
-// Generate ADC channel array from device tree
-static const struct adc_dt_spec adc_channels[] = {
-    DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, DT_SPEC_AND_COMMA)
-};
-
-// Extract channel names from device tree
-#if DT_NODE_HAS_PROP(DT_PATH(zephyr_user), io_channel_names)
-#define CHANNEL_NAME(node_id, prop, idx) \
-    DT_PROP_BY_IDX(node_id, prop, idx),
-static const char* const channel_names[] = {
-    DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channel_names, CHANNEL_NAME)
-};
-#else
-// Generate default names if not specified
-// static const char* const channel_names[] = {
-//     "ch0", "ch1", "ch2", "ch3", "ch4", "ch5",
-//     "ch6", "ch7", "ch8", "ch9", "ch10", "ch11"
-// };
-#error "Must have channel for device"
-#endif
-
 namespace Zephyr {
-
-    // Static member initialization
-    const struct adc_dt_spec ZephyrAdcDriver::m_adcChannels[] = {
-        DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, DT_SPEC_AND_COMMA)
-    };
-
-    const FwSizeType ZephyrAdcDriver::m_numChannels = ARRAY_SIZE(adc_channels);
 
     // ----------------------------------------------------------------------
     // Construction, initialization, and destruction
     // ----------------------------------------------------------------------
-
     ZephyrAdcDriver::ZephyrAdcDriver(const char* const compName) :
         ZephyrAdcDriverComponentBase(compName),
         m_samplingEnabled(false),
@@ -52,11 +26,14 @@ namespace Zephyr {
         m_sampleBuffer(0),
         m_tlmUpdateCounter(0)
     {
+        this->NUM_CHANNELS = DT_PROP_LEN(DT_PATH(zephyr_user), io_channels);
+
         // Initialize arrays
-        for (FwIndexType i = 0; i < ADC_MAX_CHANNELS; i++) {
+        for (FwSizeType i = 0; i < this->NUM_CHANNELS; i++) {
             this->m_sampleCount[i] = 0;
             this->m_errorCount[i] = 0;
             this->m_sampleInterval[i] = 100; // Default to 10Hz (100 * 10ms = 1s)
+            // this->ADC_CHANNELS[i] = adcSpecs[i];
         }
 
         // Initialize ADC sequence for single reads
@@ -66,34 +43,41 @@ namespace Zephyr {
         this->m_sequence.oversampling = 0;
         this->m_sequence.calibrate = false;
     }
-
-    ZephyrAdcDriver::~ZephyrAdcDriver() {
-        // Cleanup handled by Zephyr
-    }
+    const struct adc_dt_spec ZephyrAdcDriver::ADC_CHANNELS[] = {
+        DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, ADC_FOREACH_DT_SPEC_AND_COMMA)
+    };
 
     void ZephyrAdcDriver::init(FwSizeType queueDepth, FwEnumStoreType instance) {
-        FW_ASSERT(this->m_numChannels > ADC_MAX_CHANNELS);
-
         // Initialize each channel
-        FwIndexType channelIdx = 0;
-        for (channelIdx = 0; channelIdx < this->m_numChannels; channelIdx++) {
+        FwSizeType channelIdx = 0;
+        Fw::Logger::log("Initializing %u %u %u %u channels %u\n", this->NUM_CHANNELS, ZephyrAdcDriver::NUM_CHANNELS, FW_NUM_ARRAY_ELEMENTS(this->ADC_CHANNELS), FW_NUM_ARRAY_ELEMENTS(ZephyrAdcDriver::ADC_CHANNELS), channelIdx);
+        int st;
+        while (channelIdx < this->NUM_CHANNELS) {
+            Fw::Logger::log("Init channel id: %" PRI_BYTE " cfgId: %" PRI_BYTE " idx: %" PRI_FwSizeType " (%s)\n",
+                            this->ADC_CHANNELS[channelIdx].channel_id, this->ADC_CHANNELS[channelIdx].channel_cfg.channel_id,
+                            channelIdx, this->ADC_CHANNELS[channelIdx].dev->name);
+
             // Check if ADC device is ready
-            if (!adc_is_ready_dt(&this->m_adcChannels[channelIdx])) {
+            if (adc_is_ready_dt(&this->ADC_CHANNELS[channelIdx]) == false) {
                 break;
             }
 
             // Setup channel using device tree configuration
-            if (0 != adc_channel_setup_dt(&this->m_adcChannels[channelIdx])) {
+            st = adc_channel_setup_dt(&this->ADC_CHANNELS[channelIdx]);
+            if (0 != st) {
                 break;
             }
 
-            // Fw::Logger::log("ZephyrAdcDriver: Initialized channel %d (%s)\n",
-            //                  channelIdx, m_channelNames[channelIdx]);
+            channelIdx++;
         }
-        FW_ASSERT(channelIdx >= this->m_numChannels);
+        FW_ASSERT(channelIdx == this->NUM_CHANNELS, st, channelIdx, this->NUM_CHANNELS);
 
         // Call parent's initializer afterwards
         ZephyrAdcDriverComponentBase::init(queueDepth, instance);
+    }
+
+    ZephyrAdcDriver::~ZephyrAdcDriver() {
+        // Cleanup handled by Zephyr
     }
 
     // ----------------------------------------------------------------------
@@ -127,12 +111,7 @@ namespace Zephyr {
     void ZephyrAdcDriver::processAllChannels() {
         Os::ScopeLock lock(m_mutex);
 
-        for (FwIndexType i = 0; i < this->m_numChannels; i++) {
-            // Check if this channel should be sampled
-            if (!this->shouldSampleChannel(i)) {
-                continue;
-            }
-
+        for (FwSizeType i = 0; i < ZephyrAdcDriver::NUM_CHANNELS; i++) {
             U32 rawValue;
             F32 voltageValue;
             bool status = readChannel(i, rawValue, voltageValue);
@@ -169,33 +148,20 @@ namespace Zephyr {
         }
     }
 
-    bool ZephyrAdcDriver::shouldSampleChannel(FwIndexType channelIndex) {
-        if (channelIndex >= this->m_numChannels) {
-            return false;
-        }
-
-        // Simple time-based sampling
-        static U32 sampleCounter = 0;
-        sampleCounter++;
-
-        // Sample based on configured interval
-        return (sampleCounter % m_sampleInterval[channelIndex]) == 0;
-    }
-
     bool ZephyrAdcDriver::readChannel(FwIndexType channelIndex,
                                                U32& rawValue, F32& voltageValue) {
         // Initialize sequence for this specific channel
-        (void)adc_sequence_init_dt(&m_adcChannels[channelIndex], &this->m_sequence);
+        (void)adc_sequence_init_dt(&ADC_CHANNELS[channelIndex], &this->m_sequence);
 
 
         // Read the channel
-        int ret = adc_read_dt(&m_adcChannels[channelIndex], &this->m_sequence);
+        int ret = adc_read_dt(&ADC_CHANNELS[channelIndex], &this->m_sequence);
         if (ret < 0) {
             return false;
         }
 
         // Handle differential vs single-ended
-        rawValue = m_adcChannels[channelIndex].channel_cfg.differential ?
+        rawValue = ADC_CHANNELS[channelIndex].channel_cfg.differential ?
                    static_cast<U32>(static_cast<I16>(m_sampleBuffer)) :
                    static_cast<U32>(m_sampleBuffer);
 
@@ -205,7 +171,7 @@ namespace Zephyr {
 
         if (voltageMode) {
             I32 val_mv = static_cast<I32>(rawValue);
-            ret = adc_raw_to_millivolts_dt(&m_adcChannels[channelIndex], &val_mv);
+            ret = adc_raw_to_millivolts_dt(&ADC_CHANNELS[channelIndex], &val_mv);
             voltageValue = (ret < 0) ? 0.0f : static_cast<F32>(val_mv);
         } else {
             voltageValue = static_cast<F32>(rawValue);
@@ -298,9 +264,9 @@ namespace Zephyr {
         m_sequence.calibrate = true;
 
         bool calibrationOk = true;
-        for (FwIndexType i = 0; i < this->m_numChannels; i++) {
-            (void)adc_sequence_init_dt(&this->m_adcChannels[i], &m_sequence);
-            int ret = adc_read_dt(&this->m_adcChannels[i], &m_sequence);
+        for (FwSizeType i = 0; i < ZephyrAdcDriver::NUM_CHANNELS; i++) {
+            (void)adc_sequence_init_dt(&this->ADC_CHANNELS[i], &m_sequence);
+            int ret = adc_read_dt(&this->ADC_CHANNELS[i], &m_sequence);
             if (ret < 0) {
                 calibrationOk = false;
                 break;

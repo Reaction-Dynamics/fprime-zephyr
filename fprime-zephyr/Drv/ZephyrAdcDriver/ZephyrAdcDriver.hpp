@@ -7,19 +7,38 @@
 
 #ifndef ZEPHYR_ADC_DRIVER_HPP
 #define ZEPHYR_ADC_DRIVER_HPP
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/adc.h>
+#include <zephyr/sys/util.h>
 
-#include "Platform/PlatformSizeTypeAliasAc.h"
+// Save and clear problematic macros before F Prime headers
+#pragma push_macro("EMPTY")
+#ifdef EMPTY
+#undef EMPTY
+#endif
+
 #include "config/FwIndexTypeAliasAc.h"
 #include "config/FwSizeTypeAliasAc.h"
 #include "fprime-zephyr/Drv/ZephyrAdcDriver/FppConstantsAc.hpp"
 #include "fprime-zephyr/Drv/ZephyrAdcDriver/ZephyrAdcDriverComponentAc.hpp"
 
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/adc.h>
-#include <zephyr/sys/util.h>
 #include <Os/Mutex.hpp>
 #include <Fw/Time/Time.hpp>
+
+// Restore Zephyr macros if needed later
+#pragma pop_macro("EMPTY")
+
+// Extract channel names from device tree
+// #if DT_NODE_HAS_PROP(DT_PATH(zephyr_user), io_channel_names)
+// #define CHANNEL_NAME(node_id, prop, idx)
+//     DT_PROP_BY_IDX(node_id, prop, idx),
+// static const char* const channel_names[] = {
+//     DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channel_names, CHANNEL_NAME)
+// };
+// #else
+// #error "Must have channel for device"
+// #endif
 
 // Device tree validation
 #if !DT_NODE_EXISTS(DT_PATH(zephyr_user)) || \
@@ -27,13 +46,15 @@
 #error "No ADC channels defined in device tree overlay"
 #endif
 
-// Macro to generate ADC channel specs from device tree
-#define DT_SPEC_AND_COMMA(node_id, prop, idx) \
-    ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
+#if !DT_NODE_HAS_PROP(DT_PATH(zephyr_user), io_channels)
+#error "io-channels property missing from device tree"
+#endif
+
+#define ADC_FOREACH_DT_SPEC_AND_COMMA(node_id, prop, idx) \
+	ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
 
 namespace Zephyr {
     class ZephyrAdcDriver : public ZephyrAdcDriverComponentBase {
-
     public:
         // Constructor
         ZephyrAdcDriver(const char* const compName);
@@ -41,10 +62,11 @@ namespace Zephyr {
         // Destructor
         ~ZephyrAdcDriver();
 
-        // Get number of configured channels
-        FwSizeType getNumChannels() const { return this->m_numChannels; }
-
         void init(FwSizeType queueDepth, FwEnumStoreType instance);
+
+        // Number of channels configured in device tree
+        // static constexpr FwSizeType NUM_CHANNELS = DT_PROP_LEN(DT_PATH(zephyr_user), io_channels);
+        FwSizeType NUM_CHANNELS;
 
     PRIVATE:
 
@@ -99,9 +121,6 @@ namespace Zephyr {
         // Update telemetry for a channel
         void updateChannelTelemetry(FwIndexType channelIndex, U32 rawValue, F32 voltageValue);
 
-        // Check if channel should be sampled based on rate
-        bool shouldSampleChannel(FwIndexType channelIndex);
-
         // Initialize ADC channels from device tree
         bool initializeChannels();
 
@@ -113,10 +132,11 @@ namespace Zephyr {
         // ----------------------------------------------------------------------
 
         // ADC channel specifications from device tree
-        static const struct adc_dt_spec m_adcChannels[];
-
-        // Number of channels configured in device tree
-        static const FwSizeType m_numChannels;
+        // const struct adc_dt_spec ADC_CHANNELS[NUM_CHANNELS] = {
+        //         DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, ADC_FOREACH_DT_SPEC_AND_COMMA)
+        // };
+        // struct adc_dt_spec ADC_CHANNELS[ADC_MAX_CHANNELS] = {};
+        static const struct adc_dt_spec ADC_CHANNELS[];
 
         // Mutex for thread safety
         Os::Mutex m_mutex;

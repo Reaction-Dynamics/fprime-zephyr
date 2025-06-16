@@ -42,11 +42,11 @@ module Zephyr {
         @ Time get port
         time get port timeGetOut
 
-        @ Parameter get port
-        param get port prmGetOut
+        # @ Parameter get port
+        # param get port prmGetOut
 
-        @ Parameter set port
-        param set port prmSetOut
+        # @ Parameter set port
+        # param set port prmSetOut
 
         # ----------------------------------------------------------------------
         # Specialized ports
@@ -123,16 +123,16 @@ module Zephyr {
         # ----------------------------------------------------------------------
 
         @ Global ADC sampling enable
-        param ADC_SAMPLING_ENABLED: bool default true
+        # param ADC_SAMPLING_ENABLED: bool default true
 
         @ Per-channel sampling rates (Hz) - array sized by compile-time channels
         # param ADC_SAMPLE_RATES: F32 [ADC_MAX_CHANNELS] default [10.0, 10.0, 1.0, 1.0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 
         @ ADC timeout in milliseconds
-        param ADC_TIMEOUT_MS: U32 default 100
+        # param ADC_TIMEOUT_MS: U32 default 100
 
         @ Enable voltage conversion (vs raw counts)
-        param ADC_VOLTAGE_MODE: bool default true
+        # param ADC_VOLTAGE_MODE: bool default true
 
         # ----------------------------------------------------------------------
         # Telemetry
