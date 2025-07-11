@@ -25,7 +25,7 @@ ZephyrConditionVariable::~ZephyrConditionVariable() {
 ZephyrConditionVariable::Status ZephyrConditionVariable::pend(Os::Mutex& mutex) {
     ZephyrMutexHandle* mutex_handle = reinterpret_cast<ZephyrMutexHandle*>(mutex.getHandle());
     int status = k_condvar_wait(&this->m_handle.m_condition, &mutex_handle->m_mutex_descriptor, K_FOREVER);
-    return Status::OP_OK;
+    return status == 0 ? Status::OP_OK : Status::ERROR_OTHER;
 }
 void ZephyrConditionVariable::notify() {
     FW_ASSERT(k_condvar_signal(&this->m_handle.m_condition) == 0);
