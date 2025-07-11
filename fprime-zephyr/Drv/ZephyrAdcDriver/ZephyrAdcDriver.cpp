@@ -13,6 +13,7 @@
 #include "zephyr/drivers/adc.h"
 #include <Fw/Types/Assert.hpp>
 #include <Fw/Logger/Logger.hpp>
+#include <limits>
 
 namespace Zephyr {
 
@@ -21,21 +22,13 @@ namespace Zephyr {
     // ----------------------------------------------------------------------
     ZephyrAdcDriver::ZephyrAdcDriver(const char* const compName) :
         ZephyrAdcDriverComponentBase(compName),
-        m_sampleBuffer(0),
-        m_tlmUpdateCounter(0)
+        m_sampleBuffer(0)
     {
         this->NUM_CHANNELS = DT_PROP_LEN(DT_PATH(zephyr_user), io_channels);
 
         // Initialize ADC sequence for single reads
         this->m_sequence.buffer = &m_sampleBuffer;
         this->m_sequence.buffer_size = sizeof(m_sampleBuffer);
-
-        // Reset error counts
-        for (FwIndexType i = 0; i < FW_NUM_ARRAY_ELEMENTS(this->m_errorCounts); i++) {
-            this->m_errorCounts[i] = 0;
-            this->m_countSamples[i] = 0;
-            this->m_voltageSamples[i] = 0.0f;
-        }
     }
     const struct adc_dt_spec ZephyrAdcDriver::ADC_CHANNELS[] = {
         DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, ADC_FOREACH_DT_SPEC_AND_COMMA)
@@ -56,11 +49,25 @@ namespace Zephyr {
                 break;
             }
 
+            this->m_sequence.calibrate = true;
+            this->m_sequence.buffer = &this->m_sampleBuffer;
+            this->m_sequence.buffer_size = sizeof(this->m_sampleBuffer);
+
             // Setup channel using device tree configuration
             st = adc_channel_setup_dt(&this->ADC_CHANNELS[channelIdx]);
             if (0 != st) {
                 break;
             }
+
+            // Initialize sequence for this specific channel
+            st = adc_sequence_init_dt(&this->ADC_CHANNELS[channelIdx], &this->m_sequence);
+            if (0 != st) {
+                break;
+            }
+
+            Os::RawTimeInterface::Status timeStatus;
+            timeStatus = this->m_timestamps[channelIdx].now();
+            FW_ASSERT(timeStatus == Os::RawTimeInterface::Status::OP_OK);
 
             channelIdx++;
         }
@@ -68,10 +75,6 @@ namespace Zephyr {
 
         // Call parent's initializer afterwards
         ZephyrAdcDriverComponentBase::init(queueDepth, instance);
-    }
-
-    ZephyrAdcDriver::~ZephyrAdcDriver() {
-        // Cleanup handled by Zephyr
     }
 
     // ----------------------------------------------------------------------
@@ -82,22 +85,13 @@ namespace Zephyr {
         const FwIndexType portNum,
         U32 context
     ) {
-        // Process all configured channels
-        this->processAllChannels();
-
-        // Update telemetry periodically
-        // if ((++m_tlmUpdateCounter % 50) == 0) { // Every ~500ms
-        //     this->tlmWrite_ADC_DRIVER_STATUS(Drv::AdcStatus::OP_OK);
-        // }
-    }
-
-    void ZephyrAdcDriver::processAllChannels() {
-        Os::ScopeLock lock(m_mutex);
+        Os::ScopeLock lock(this->m_mutex);
 
         for (FwSizeType i = 0; i < this->NUM_CHANNELS; i++) {
-            bool status = this->readChannel(i);
+            I32 rawSample;
+            F32 mvSample;
+            bool status = this->readChannel(i, rawSample, mvSample);
             if (!status) {
-                this->m_errorCounts[i]++;
                 this->log_WARNING_HI_ADC_READ_ERROR(
                     static_cast<U8>(i),
                     static_cast<I32>(status)
@@ -105,103 +99,59 @@ namespace Zephyr {
                 continue;
             }
 
+            Os::RawTimeInterface::Status timeStatus;
+            Os::RawTime currentTime;
+            Fw::TimeInterval interval;
+            timeStatus = currentTime.now();
+            FW_ASSERT(timeStatus == Os::RawTimeInterface::Status::OP_OK);
+
+            timeStatus = this->m_timestamps[i].getTimeInterval(currentTime, interval);
+            FW_ASSERT(timeStatus == Os::RawTimeInterface::Status::OP_OK);
+
+            F32 intervalTotalSeconds;
+            // This will give us a float with [seconds].[milliseconds]
+            // NOTE we divide by 1000 not 100000 to convert Us to Ms
+            intervalTotalSeconds = interval.getSeconds() + static_cast<F32>(interval.getUSeconds()) / 1000;
+
+            U32 currentCount = this->m_samples[i].getCount();
+            this->m_samples[i].set(1.0f/intervalTotalSeconds, ++currentCount, mvSample, rawSample);
             // Send data on async output port
             if (!this->isConnected_adcCountSample_OutputPort(i)) {
                 continue;
             }
-
-            Fw::Time timestamp;
-            // this->getTime(timestamp);
-
-            // Create ADC sample
-            // Drv::AdcSample sample;
-            // sample.setChannel(static_cast<U8>(i));
-            // sample.setRawValue(rawValue);
-            // sample.setVoltageValue(voltageValue);
-            // sample.setTimestamp(timestamp);
-
-            // this->adcCountSample_out(i, sample);
-
         }
 
         // Update telemetry
-        this->updateChannelTelemetry();
+        this->tlmWrite_ADC_STATUS(this->m_samples);
     }
 
-    bool ZephyrAdcDriver::readChannel(FwIndexType channelIndex) {
-        // Initialize sequence for this specific channel
-        (void)adc_sequence_init_dt(&this->ADC_CHANNELS[channelIndex], &this->m_sequence);
+    bool ZephyrAdcDriver::readChannel(FwIndexType channelIndex, I32 &rawSample, F32 &mvSample) {
         // Read the channel
         int ret = adc_read_dt(&this->ADC_CHANNELS[channelIndex], &this->m_sequence);
         FW_ASSERT(ret == 0, ret, channelIndex);
 
+        // Since we're using an I32 to handle the raw sample we need to make sure the sample is less than that
+        FW_ASSERT(std::numeric_limits<I32>::max() > *static_cast<U32*>(this->m_sequence.buffer),
+                  *static_cast<U32*>(this->m_sequence.buffer));
+
         // Handle differential vs single-ended
-        U32 rawValue = this->ADC_CHANNELS[channelIndex].channel_cfg.differential ?
-                   static_cast<U32>(static_cast<I16>(m_sampleBuffer)) :
-                   static_cast<U32>(m_sampleBuffer);
+        rawSample = this->ADC_CHANNELS[channelIndex].channel_cfg.differential ?
+                   *static_cast<U32*>(this->m_sequence.buffer) :
+                   *static_cast<I32*>(this->m_sequence.buffer);
 
-        this->m_countSamples[channelIndex] = rawValue;
-
-        I32 voltageValue;
-        if (this->ADC_CHANNELS[channelIndex].channel_cfg.differential) {
-            voltageValue = static_cast<I32>(static_cast<I16>(rawValue));
-        } else {
-            voltageValue = static_cast<I32>(rawValue);
-        }
+        I32 voltageValue = rawSample;
 
         ret = adc_raw_to_millivolts_dt(&this->ADC_CHANNELS[channelIndex], &voltageValue);
         FW_ASSERT(ret == 0, ret, channelIndex);
 
-        this->m_voltageSamples[channelIndex] = static_cast<F32>(voltageValue);
+        mvSample = static_cast<F32>(voltageValue);
 
         return true;
-    }
-
-    void ZephyrAdcDriver::updateChannelTelemetry() {
-        // Update per-channel telemetry arrays
-        ADC_CHANNEL_U32s counts(this->m_countSamples);
-        ADC_CHANNEL_U32s errors(this->m_errorCounts);
-        ADC_CHANNEL_F32s voltages(this->m_voltageSamples);
-
-        this->tlmWrite_ADC_RAW_COUNTS(counts);
-        this->tlmWrite_ADC_ERROR_COUNT(errors);
-        this->tlmWrite_ADC_VOLTAGES_MV(voltages);
     }
 
     // ----------------------------------------------------------------------
     // Command handler implementations
     // ----------------------------------------------------------------------
-
-
-    void ZephyrAdcDriver::ADC_READ_SINGLE_cmdHandler(
-        const FwOpcodeType opCode,
-        const U32 cmdSeq,
-        U8 channel
-    ) {
-        Os::ScopeLock lock(m_mutex);
-
-        Fw::Logger::log("Handling read request for channel %u\n", channel);
-        bool status = this->readChannel(channel);
-        if (!status) {
-            this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
-            return;
-        }
-
-        // Send immediate result on output port
-        if (this->isConnected_adcCountSample_OutputPort(channel)) {
-            Fw::Time timestamp;
-            // this->getTime(timestamp);
-
-            // Drv::AdcSample sample;
-            // sample.setChannel(channel);
-            // sample.setRawValue(rawValue);
-            // sample.setVoltageValue(voltageValue);
-            // sample.setTimestamp(timestamp);
-
-            // this->adcCountSample_out(channel, sample);
-        }
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-    }
 
     void ZephyrAdcDriver::ADC_CALIBRATE_cmdHandler(
         const FwOpcodeType opCode,

@@ -7,7 +7,10 @@
 
 #ifndef ZEPHYR_ADC_DRIVER_HPP
 #define ZEPHYR_ADC_DRIVER_HPP
-#include "fprime-zephyr/Drv/ZephyrAdcDriver/ADC_CHANNEL_F32sArrayAc.hpp"
+#include "Fw/Types/BasicTypes.h"
+#include "Os/RawTime.hpp"
+#include "fprime-zephyr/Drv/ZephyrAdcDriver/AdcSampleSerializableAc.hpp"
+#include "fprime-zephyr/Drv/ZephyrAdcDriver/AdcConfigSerializableAc.hpp"
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/adc.h>
@@ -61,7 +64,7 @@ namespace Zephyr {
         ZephyrAdcDriver(const char* const compName);
 
         // Destructor
-        ~ZephyrAdcDriver();
+        ~ZephyrAdcDriver() {};
 
         void init(FwSizeType queueDepth, FwEnumStoreType instance);
 
@@ -85,12 +88,6 @@ namespace Zephyr {
         // Command handler implementations
         // ----------------------------------------------------------------------
 
-        void ADC_READ_SINGLE_cmdHandler(
-            const FwOpcodeType opCode,
-            const U32 cmdSeq,
-            U8 channel
-        ) override;
-
         void ADC_CALIBRATE_cmdHandler(
             const FwOpcodeType opCode,
             const U32 cmdSeq
@@ -101,13 +98,7 @@ namespace Zephyr {
         // ----------------------------------------------------------------------
 
         // // Read single ADC channel
-        bool readChannel(FwIndexType channelIndex);
-
-        // Process all configured channels
-        void processAllChannels();
-
-        // Update telemetry for a channel
-        void updateChannelTelemetry();
+        bool readChannel(FwIndexType channelIndex, I32 &rawSample, F32 &mvSample);
 
         // Initialize ADC channels from device tree
         bool initializeChannels();
@@ -130,17 +121,13 @@ namespace Zephyr {
         Os::Mutex m_mutex;
 
         // Sampling state
-        U32 m_errorCounts[ADC_MAX_CHANNELS];
-
-        F32 m_voltageSamples[ADC_MAX_CHANNELS];
-        U32 m_countSamples[ADC_MAX_CHANNELS];
+        Drv::AdcSample m_samples[ADC_MAX_CHANNELS];
+        Os::RawTime m_timestamps[ADC_MAX_CHANNELS];
+        Drv::AdcConfig m_configs[ADC_MAX_CHANNELS];
 
         // ADC sequence buffer for single reads
         U16 m_sampleBuffer;
         struct adc_sequence m_sequence;
-
-        // Telemetry update counters
-        U32 m_tlmUpdateCounter;
     };
 
 } // end namespace Zephyr

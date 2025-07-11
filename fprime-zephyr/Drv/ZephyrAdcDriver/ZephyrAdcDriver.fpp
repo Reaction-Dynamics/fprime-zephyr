@@ -4,12 +4,23 @@ module Drv {
     INVALID_CHANNEL @< Operation not permitted with current configuration
     UNKNOWN_ERROR @< An unknown error occurred
   }
+
+  struct AdcConfig {
+    Id: U8
+    VRefMv: F32
+  }
+
+  struct AdcSample {
+    RateHz: F32
+    Count: U32
+    Mv: F32
+    Raw: U32
+  }
 }
 
 module Zephyr {
     constant ADC_MAX_CHANNELS = 8
-    array ADC_CHANNEL_U32s = [ADC_MAX_CHANNELS] U32
-    array ADC_CHANNEL_F32s = [ADC_MAX_CHANNELS] F32
+    array ADC_CHANNELS = [ADC_MAX_CHANNELS] Drv.AdcSample
 
     port U32_Port() -> U32
     port F32_Port() -> F32
@@ -63,11 +74,6 @@ module Zephyr {
         # Commands
         # ----------------------------------------------------------------------
 
-        @ Read single ADC sample on demand
-        async command ADC_READ_SINGLE(
-            channel: U8 @< Channel index to read
-        )
-
         @ Calibrate ADC (if supported by hardware)
         async command ADC_CALIBRATE
 
@@ -115,21 +121,7 @@ module Zephyr {
         # Telemetry
         # ----------------------------------------------------------------------
 
-        @ Raw ADC counts per channel
-        telemetry ADC_RAW_COUNTS: ADC_CHANNEL_U32s
-
-        telemetry LATEST_ADC_SAMPLE: U32
-
-        @ Converted voltages per channel (mV)
-        telemetry ADC_VOLTAGES_MV: ADC_CHANNEL_F32s
-
-        @ ADC read errors per channel
-        telemetry ADC_ERROR_COUNT: ADC_CHANNEL_U32s
-
-        @ ADC sampling frequency achieved per channel
-        telemetry ADC_ACTUAL_RATES: ADC_CHANNEL_F32s
-
-        # Driver status
-        # telemetry ADC_DRIVER_STATUS: Drv.AdcStatus
+        @ Driver status
+        telemetry ADC_STATUS: ADC_CHANNELS
     }
 }
