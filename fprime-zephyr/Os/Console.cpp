@@ -2,6 +2,7 @@
 // \title fprime-zephyr/Os/Console.cpp
 // \brief Zephyr implementation for Os::Console
 // ======================================================================
+#include "zephyr/toolchain.h"
 #include <fprime-zephyr/Os/Console.hpp>
 #include <Fw/Types/Assert.hpp>
 #include <zephyr/kernel.h>
@@ -14,7 +15,8 @@ namespace Console {
 
 void ZephyrConsole::writeMessage(const CHAR *message, const FwSizeType size) {
     int message_size = (size >= std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max() : static_cast<int>(size);
-    printk("[Os::Console] %.*s", message_size, message);
+    ARG_UNUSED(message_size);
+    // printk("[Os::Console] %.*s", message_size, message);
 }
 
 ConsoleHandle* ZephyrConsole::getHandle() {

@@ -34,9 +34,7 @@ namespace Zephyr {
         FW_ASSERT(dev != nullptr);
         m_dev = dev;
 
-        if (!device_is_ready(this->m_dev)) {
-            return;
-        }
+        // FW_ASSERT(device_is_ready(this->m_dev));
 
         struct uart_config uart_cfg = {
             .baudrate = baud_rate,
