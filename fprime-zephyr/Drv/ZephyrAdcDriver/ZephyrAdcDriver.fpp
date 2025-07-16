@@ -128,6 +128,6 @@ module Zephyr {
         @ Driver status
         telemetry ADC_STATUS: ADC_CHANNELS
 
-        telemetry ADC_CONFIG: ADC_CONFIGS
+        # telemetry ADC_CONFIG: ADC_CONFIGS
     }
 }
