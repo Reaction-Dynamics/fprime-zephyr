@@ -6,7 +6,8 @@ module Drv {
   }
 
   struct AdcConfig {
-    Id: U8
+    AfecInst: U8
+    ChannelId: U8
     VRefMv: F32
   }
 
@@ -21,6 +22,7 @@ module Drv {
 module Zephyr {
     constant ADC_MAX_CHANNELS = 8
     array ADC_CHANNELS = [ADC_MAX_CHANNELS] Drv.AdcSample
+    array ADC_CONFIGS = [ADC_MAX_CHANNELS] Drv.AdcConfig
 
     port U32_Port() -> U32
     port F32_Port() -> F32
@@ -77,6 +79,8 @@ module Zephyr {
         @ Calibrate ADC (if supported by hardware)
         async command ADC_CALIBRATE
 
+        async command EMIT_DEVICE_CONFIG
+
         # ----------------------------------------------------------------------
         # Events
         # ----------------------------------------------------------------------
@@ -123,5 +127,7 @@ module Zephyr {
 
         @ Driver status
         telemetry ADC_STATUS: ADC_CHANNELS
+
+        telemetry ADC_CONFIG: ADC_CONFIGS
     }
 }

@@ -57,6 +57,29 @@
 #define ADC_FOREACH_DT_SPEC_AND_COMMA(node_id, prop, idx) \
 	ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
 
+
+#define AFEC_COMPAT atmel_sam_afec
+
+// Macro to get ADC specs and instance names for each channel using standard API
+#define CREATE_ADC_SPEC_FOR_CHANNEL(node_id) \
+    ADC_DT_SPEC_STRUCT(DT_PARENT(node_id), DT_REG_ADDR(node_id)),
+
+#define PROCESS_AFEC_CHANNELS(inst, compat, ...) \
+    DT_FOREACH_CHILD(DT_INST(inst, compat), CREATE_ADC_SPEC_FOR_CHANNEL)
+
+// NOTE we should be able to use DT_STRINGIFY_INTERNAL to get the node label.
+// Instead we leverage compat here which is a bit of a hack
+#define CREATE_INSTANCE_NAME_FOR_CHANNEL(node_id, compat, inst) \
+     #compat "_" DT_STRINGIFY_INTERNAL(inst) "_" DT_NODE_FULL_NAME(node_id),
+
+#define PROCESS_AFEC_INSTANCE_NAMES(inst, compat, ...) \
+    DT_FOREACH_CHILD_VARGS(DT_INST(inst, compat), CREATE_INSTANCE_NAME_FOR_CHANNEL, compat, inst)
+
+#define COUNT_SINGLE_CHANNEL(node_id) +1
+
+#define COUNT_AFEC_CHANNELS(compat, inst) \
+    DT_FOREACH_CHILD(DT_DRV_INST(inst), COUNT_SINGLE_CHANNEL)
+
 namespace Zephyr {
     class ZephyrAdcDriver : public ZephyrAdcDriverComponentBase {
     public:
@@ -93,6 +116,11 @@ namespace Zephyr {
             const U32 cmdSeq
         ) override;
 
+        //! Handler implementation for command EMIT_CONFIG
+        void EMIT_DEVICE_CONFIG_cmdHandler(FwOpcodeType opCode, //!< The opcode
+                                U32 cmdSeq           //!< The command sequence number
+                                ) override;
+
         // ----------------------------------------------------------------------
         // Private helper methods
         // ----------------------------------------------------------------------
@@ -116,6 +144,7 @@ namespace Zephyr {
         // };
         // struct adc_dt_spec ADC_CHANNELS[ADC_MAX_CHANNELS] = {};
         static const struct adc_dt_spec ADC_CHANNELS[];
+        static const char* const __attribute__((optimize(0))) INSTANCE_NAMES[];
 
         // Mutex for thread safety
         Os::Mutex m_mutex;

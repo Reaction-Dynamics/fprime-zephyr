@@ -31,7 +31,11 @@ namespace Zephyr {
         this->m_sequence.buffer_size = sizeof(m_sampleBuffer);
     }
     const struct adc_dt_spec ZephyrAdcDriver::ADC_CHANNELS[] = {
-        DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels, ADC_FOREACH_DT_SPEC_AND_COMMA)
+        DT_COMPAT_FOREACH_STATUS_OKAY_VARGS(AFEC_COMPAT, PROCESS_AFEC_CHANNELS)
+    };
+
+    const char* const ZephyrAdcDriver::INSTANCE_NAMES[] = {
+        DT_COMPAT_FOREACH_STATUS_OKAY_VARGS(AFEC_COMPAT, PROCESS_AFEC_INSTANCE_NAMES)
     };
 
     void ZephyrAdcDriver::init(FwSizeType queueDepth, FwEnumStoreType instance) {
@@ -42,12 +46,14 @@ namespace Zephyr {
         while (channelIdx < this->NUM_CHANNELS) {
             Fw::Logger::log("Init channel id: %" PRI_BYTE " cfgId: %" PRI_BYTE " idx: %" PRI_FwSizeType " (%s)\n",
                             this->ADC_CHANNELS[channelIdx].channel_id, this->ADC_CHANNELS[channelIdx].channel_cfg.channel_id,
-                            channelIdx, this->ADC_CHANNELS[channelIdx].dev->name);
+                            channelIdx, this->ADC_CHANNELS[channelIdx].dev->name, this->INSTANCE_NAMES[channelIdx]);
 
             // Check if ADC device is ready
             if (adc_is_ready_dt(&this->ADC_CHANNELS[channelIdx]) == false) {
                 break;
             }
+
+            // this->m_configs[channelIdx].set(, );
 
             this->m_sequence.calibrate = true;
             this->m_sequence.buffer = &this->m_sampleBuffer;
@@ -160,25 +166,29 @@ namespace Zephyr {
         Os::ScopeLock lock(m_mutex);
 
         // Perform calibration read on all channels
-        m_sequence.calibrate = true;
+        this->m_sequence.calibrate = true;
 
         bool calibrationOk = true;
         for (FwSizeType i = 0; i < ZephyrAdcDriver::NUM_CHANNELS; i++) {
-            (void)adc_sequence_init_dt(&this->ADC_CHANNELS[i], &m_sequence);
-            int ret = adc_read_dt(&this->ADC_CHANNELS[i], &m_sequence);
+            (void)adc_sequence_init_dt(&this->ADC_CHANNELS[i], &this->m_sequence);
+            int ret = adc_read_dt(&this->ADC_CHANNELS[i], &this->m_sequence);
             if (ret < 0) {
                 calibrationOk = false;
                 break;
             }
         }
 
-        m_sequence.calibrate = false; // Reset for normal operations
+        this->m_sequence.calibrate = false; // Reset for normal operations
 
         // Drv::AdcStatus status = calibrationOk ? Drv::AdcStatus::OP_OK : Drv::AdcStatus::UNKNOWN_ERROR;
         // this->log_ACTIVITY_LOW_ADC_CALIBRATION_DONE(status);
 
         this->cmdResponse_out(opCode, cmdSeq,
                             calibrationOk ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
+    }
+
+    void ZephyrAdcDriver ::EMIT_DEVICE_CONFIG_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
     }
 
 } // end namespace Zephyr
