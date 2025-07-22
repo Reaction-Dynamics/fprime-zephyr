@@ -15,8 +15,7 @@ namespace Console {
 
 void ZephyrConsole::writeMessage(const CHAR *message, const FwSizeType size) {
     int message_size = (size >= std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max() : static_cast<int>(size);
-    ARG_UNUSED(message_size);
-    // printk("[Os::Console] %.*s", message_size, message);
+    printk("[Os::Console] %.*s", message_size, message);
 }
 
 ConsoleHandle* ZephyrConsole::getHandle() {
