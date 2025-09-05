@@ -29,7 +29,7 @@ namespace Task {
     }
     void ZephyrTask::onStart() {}
 
-    Os::Task::Status ZephyrTask::start(const Arguments& arguments) {
+    Os::Task::Status ZephyrTask::start(const TaskInterface::Arguments& arguments) {
         size_t stack_size = static_cast<size_t>(arguments.m_stackSize);
         
         k_thread_stack_t *stack = k_thread_stack_alloc(stack_size, 0);
@@ -49,7 +49,8 @@ namespace Task {
 
 
 #ifdef CONFIG_THREAD_NAME
-        k_thread_name_set(&this->m_handle.m_task_descriptor, this->arguments.m_name.toChar());
+        this->m_name = arguments.m_name;
+        k_thread_name_set(&this->m_handle.m_task_descriptor, this->m_name.toChar());
 #endif
         k_thread_start(tid);
         return Os::Task::Status::OP_OK;

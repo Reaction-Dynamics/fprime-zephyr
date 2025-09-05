@@ -84,6 +84,9 @@ namespace Task {
         //! \param interval: delay time
         //! \return status of the delay
         Status _delay(Fw::TimeInterval interval) override;
+#ifdef CONFIG_THREAD_NAME
+        TaskString m_name;  //!< Task object name
+#endif
 
         //! \brief return the underlying task handle (implementation specific)
         //! \return internal task handle representation
