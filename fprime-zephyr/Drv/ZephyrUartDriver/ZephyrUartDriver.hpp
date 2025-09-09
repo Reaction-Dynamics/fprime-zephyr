@@ -7,6 +7,7 @@
 #ifndef ZephyrUartDriver_HPP
 #define ZephyrUartDriver_HPP
 
+#include "config/FwIndexTypeAliasAc.h"
 #include "fprime-zephyr/Drv/ZephyrUartDriver/ZephyrUartDriverComponentAc.hpp"
 
 #include <zephyr/kernel.h>
@@ -44,7 +45,18 @@ namespace Zephyr {
 
     public:
 
+#if defined(CONFIG_UART_ASYNC_API)
+        // Async RX buffers (double buffering) for dma
+        U8 async_rx_buffer[2][256];
+        FwIndexType async_rx_buffer_idx;
+        static void serial_cb(const struct device *dev, struct uart_event *evt, void *user_data);
+#elif defined(CONFIG_UART_INTERRUPT_DRIVEN)
         static void serial_cb(const struct device *dev, void *user_data);
+#else
+#error "Cannot build ZephyrUartDriver without an rx mechanism"
+#endif
+
+        void setup_async_rx();
 
         // ----------------------------------------------------------------------
         // Handler implementations for user-defined typed input ports
