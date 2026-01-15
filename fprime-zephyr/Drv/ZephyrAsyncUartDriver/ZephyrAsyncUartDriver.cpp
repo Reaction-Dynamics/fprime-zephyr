@@ -35,21 +35,7 @@ void ZephyrAsyncUartDriver::uartEventCallback(const struct device *dev,
       static_cast<ZephyrUartStopReason::T>(evt->data.rx_stop.reason));
 
   switch (evt->type) {
-  case UART_RX_BUF_REQUEST:
-    uartBuff = driver->allocate_out(0, RX_ACCUMULATE_SIZE);
-    rc = uart_rx_buf_rsp(dev, reinterpret_cast<uint8_t *>(uartBuff.getData()),
-                         uartBuff.getSize());
-    FW_ASSERT(uartBuff.getSize() >= RX_ACCUMULATE_SIZE, uartBuff.getSize());
-    // Indicates Next Buffer is already set so we can de allocate this one
-    if (rc == -EBUSY) {
-      driver->deallocate_out(0, uartBuff);
-      break;
-    }
-    FW_ASSERT(rc == 0, rc);
-    driver->m_rxBuffContext = uartBuff.getContext();
-    break;
   case UART_RX_RDY:
-    // TODO consider using a ring buffer here
     uartBuff.set(reinterpret_cast<U8 *>(evt->data.rx.buf + evt->data.rx.offset),
                  evt->data.rx.len, Fw::Buffer::NO_CONTEXT);
     // NOTE this is expected to block until the buffer is passed down stream and
@@ -61,27 +47,31 @@ void ZephyrAsyncUartDriver::uartEventCallback(const struct device *dev,
                          ? Drv::ByteStreamStatus::OP_OK
                          : Drv::ByteStreamStatus::RECV_NO_DATA);
     break;
-  case UART_RX_STOPPED:
-    driver->log_WARNING_HI_ZEPHYR_RX_STOPPED(stopReason);
-  case UART_RX_BUF_RELEASED:
   case UART_RX_DISABLED:
     uartBuff.set(reinterpret_cast<U8 *>(evt->data.rx_buf.buf), evt->data.rx.len,
                  driver->m_rxBuffContext);
     driver->deallocate_out(0, uartBuff);
     break;
+
   case UART_TX_DONE:
+    // Return TX buffer to its owner
     driver->drvAsyncSendReturnOut_out(0, driver->m_pendingTxBuff,
                                       Drv::ByteStreamStatus::OP_OK);
     break;
+
   default:
+    // Ignore other events (UART_RX_BUF_RELEASED handled above).
     break;
   }
 }
 
-ZephyrAsyncUartDriver ::ZephyrAsyncUartDriver(const char *const compName)
-    : ZephyrAsyncUartDriverComponentBase(compName) {}
+ZephyrAsyncUartDriver::ZephyrAsyncUartDriver(const char *const compName)
+    : ZephyrAsyncUartDriverComponentBase(compName) {
+  // Initialize tracked pointer to null
+  this->m_rxBuffPtr = nullptr;
+}
 
-ZephyrAsyncUartDriver ::~ZephyrAsyncUartDriver() {}
+ZephyrAsyncUartDriver::~ZephyrAsyncUartDriver() {}
 
 void ZephyrAsyncUartDriver::configure(const struct device *dev, U32 baud_rate) {
   FW_ASSERT(dev != nullptr);
@@ -115,20 +105,17 @@ void ZephyrAsyncUartDriver::configure(const struct device *dev, U32 baud_rate) {
 // ----------------------------------------------------------------------
 // Handler implementations for user-defined typed input ports
 // ----------------------------------------------------------------------
-void ZephyrAsyncUartDriver ::asyncSend_handler(const FwIndexType portNum,
-                                               Fw::Buffer &sendBuffer) {
-  Drv::ByteStreamStatus sendResponse = Drv::ByteStreamStatus::OP_OK;
+void ZephyrAsyncUartDriver::asyncSend_handler(const FwIndexType portNum,
+                                              Fw::Buffer &sendBuffer) {
   FW_ASSERT(this->isConnected_drvAsyncSendReturnOut_OutputPort(0));
 
-  uint8_t *orig_buf = reinterpret_cast<uint8_t *>(sendBuffer.getData());
-  size_t orig_size = sendBuffer.getSize();
-
-  int rc;
-  // TODO check the workqueue status here
+  // Store pending tx to correlate in TX_DONE event
   this->m_pendingTxBuff = sendBuffer;
 
-  rc = uart_tx(this->m_dev, orig_buf, orig_size, SYS_FOREVER_US);
-  switch (rc) {
+  int status =
+      uart_tx(this->m_dev, reinterpret_cast<uint8_t *>(sendBuffer.getData()),
+              sendBuffer.getSize(), SYS_FOREVER_US);
+  switch (status) {
   case (-EBUSY):
     this->drvAsyncSendReturnOut_out(0, sendBuffer,
                                     Drv::ByteStreamStatus::SEND_RETRY);
@@ -138,22 +125,23 @@ void ZephyrAsyncUartDriver ::asyncSend_handler(const FwIndexType portNum,
                                     Drv::ByteStreamStatus::OTHER_ERROR);
     break;
   case 0:
-    // Track the buffer here via sendBuffer.getContext()
+    // Normal start: actual completion will be signalled via UART_TX_DONE
     break;
   }
 }
 
 Drv::ByteStreamStatus
-ZephyrAsyncUartDriver ::send_handler(const FwIndexType portNum,
-                                     Fw::Buffer &sendBuffer) {
-  // This driver doesn't support this send command
+ZephyrAsyncUartDriver::send_handler(const FwIndexType portNum,
+                                    Fw::Buffer &sendBuffer) {
+  // This driver doesn't support synchronous send
   return Drv::ByteStreamStatus::OTHER_ERROR;
 }
 
-void ZephyrAsyncUartDriver ::recvReturnIn_handler(const FwIndexType portNum,
-                                                  Fw::Buffer &returnBuffer) {
-  // NOTE this is a NO-OP since we manage the buffer based off of the uart state
-  // machine this->deallocate_out(0, returnBuffer);
+void ZephyrAsyncUartDriver::recvReturnIn_handler(const FwIndexType portNum,
+                                                 Fw::Buffer &returnBuffer) {
+  // NOTE: For ring-buffer DMA drivers the buffer pointers seen in RX_RDY are
+  // driver-owned. W
+  // matches dwibuffer. Therefore this method remains a NO-OP.
 }
 
 } // end namespace Zephyr
