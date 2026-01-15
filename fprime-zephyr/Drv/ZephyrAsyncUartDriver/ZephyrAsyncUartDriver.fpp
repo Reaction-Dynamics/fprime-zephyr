@@ -1,11 +1,5 @@
 module Zephyr {
 
-  struct BufferDescriptor {
-    Address: U64
-    Length: FwSizeType
-    Context: FwIdType
-  }
-
   @Derived from zephyr/drivers/uart.h v4.2
   enum ZephyrUartStopReason: U8 {
     ERROR_OVERRUN   = 1,
@@ -47,18 +41,8 @@ module Zephyr {
     # ----------------------------------------------------------------------
     # Events
     # ----------------------------------------------------------------------
-    @ Invalid PUS packet structure
-    event ZEPHYR_UART_STATE_CHANGE(
-        driverStateId: U32,
-        driverStateStr: string size 25,
-    ) \
-    severity activity low \
-    format "{} {}"
-
     event ZEPHYR_RX_STOPPED(
         stopReason: ZephyrUartStopReason,
-    ) \
-    severity warning high \
-    format "{}"
+    ) severity warning high format "{}"
   }
 }
