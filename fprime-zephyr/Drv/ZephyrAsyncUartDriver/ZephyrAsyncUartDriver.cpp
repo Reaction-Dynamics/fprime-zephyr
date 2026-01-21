@@ -9,6 +9,7 @@
 #include "Fw/Buffer/Buffer.hpp"
 #include "Fw/Types/Assert.hpp"
 #include "config/FwIndexTypeAliasAc.h"
+#include "config/FwSizeTypeAliasAc.h"
 #include <Fw/FPrimeBasicTypes.hpp>
 #include <Fw/Logger/Logger.hpp>
 #include <cerrno>
@@ -94,7 +95,7 @@ void ZephyrAsyncUartDriver::uartEventCallback(const struct device *dev,
   }
 }
 
-void ZephyrAsyncUartDriver::configure(const struct device *dev, U32 baud_rate) {
+void ZephyrAsyncUartDriver::configure(const struct device *dev, U32 baud_rate,  FwSizeType rx_buffer_size) {
   FW_ASSERT(dev != nullptr);
   this->m_dev = dev;
 
@@ -107,10 +108,8 @@ void ZephyrAsyncUartDriver::configure(const struct device *dev, U32 baud_rate) {
   // Allocate a single persistent RX buffer and hand it to the Zephyr UART
   // driver. We will copy data out on RX_RDY; this persistent buffer is owned by
   // this component and will be freed on UART_RX_DISABLED.
-  this->m_rxBuff = this->allocate_out(0, RX_BUFFER_SIZE);
-  FW_ASSERT(this->m_rxBuff.isValid() &&
-                this->m_rxBuff.getSize() >= RX_BUFFER_SIZE,
-            this->m_rxBuff.getSize());
+  this->m_rxBuff = this->allocate_out(0, rx_buffer_size);
+  FW_ASSERT(this->m_rxBuff.isValid() && this->m_rxBuff.getSize() >= rx_buffer_size, this->m_rxBuff.getSize());
 
   status = uart_rx_enable(this->m_dev,
                           reinterpret_cast<uint8_t *>(this->m_rxBuff.getData()),

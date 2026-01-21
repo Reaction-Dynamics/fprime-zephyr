@@ -37,11 +37,9 @@ public:
   //!
   ~ZephyrAsyncUartDriver();
 
-  void configure(const struct device *dev, U32 baud_rate);
+  void configure(const struct device* dev, U32 baud_rate, FwSizeType rx_buffer_size);
 
 public:
-  static constexpr FwSizeType RX_BUFFER_SIZE = 8 * 1024;
-
   // ----------------------------------------------------------------------
   // Handler implementations for user-defined typed input ports
   // ----------------------------------------------------------------------
